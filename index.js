@@ -17,29 +17,37 @@ console.log(`Broker URL: ${process.env.BROKER_URL}`)
 
 
 mqttReq.response("v1/users/register", (payload) => {
-    const { username, password, name, role } = JSON.parse(payload)
-    const passwordHash = bcrypt.hashSync(password, PW_SALT_ROUNDS)
+    payload = JSON.parse(payload)
+
+    if (!payload.username || !payload.password || !payload.name || !payload.role)
+        return JSON.stringify({ httpStatus: 400, message: "username, password, name and role must be set" })
+
+    const passwordHash = bcrypt.hashSync(payload.password, PW_SALT_ROUNDS)
 
     try {
-        db.querySync("insert into public.user (username, pw_hash, name, role) values ($1, $2, $3, $4)", [username, passwordHash, name, role])
-        return JSON.stringify({ httpStatus: 201, message: `Registered user ${username}` })
+        db.querySync("insert into public.user (username, pw_hash, name, role) values ($1, $2, $3, $4)", [payload.username, passwordHash, payload.name, payload.role])
+        return JSON.stringify({ httpStatus: 201, message: `Registered user ${payload.username}` })
     } catch (e) {
-        console.log(e)
-        return JSON.stringify({ httpStatus: 400, message: `Username ${username} already exists` })
+        return JSON.stringify({ httpStatus: 400, message: `Username ${payload.username} already exists` })
     }
 });
 
 mqttReq.response("v1/users/login", (payload) => {
-    const { username, password } = JSON.parse(payload)
-    const users = db.querySync("select username, name, pw_hash, role from public.user where username = $1", [username])
+    payload = JSON.parse(payload)
+
+    if (!payload.username || !payload.password)
+        return JSON.stringify({ httpStatus: 400, message: "username and password must be set" })
+
+    const users = db.querySync("select username, name, pw_hash, role from public.user where username = $1", [payload.username])
 
     if (!users || users.length == 0)
         return JSON.stringify({ httpStatus: 404, message: "User not found" })
 
-    if (bcrypt.compareSync(password, users[0].pw_hash)) {
-        const user = users[0]
-        const token = jwt.sign({ username: user.username, role: user.role, name: user.name }, JWT_SECRET)
-        return JSON.stringify({ httpStatus: 200, message: "Authentication successful", token })
+    if (bcrypt.compareSync(payload.password, users[0].pw_hash)) {
+        let user = users[0]
+        user = { username: user.username, role: user.role, name: user.name }
+        const token = jwt.sign(user, JWT_SECRET)
+        return JSON.stringify({ httpStatus: 200, user, message: "Authentication successful", token })
     }
 
     return JSON.stringify({ httpStatus: 400, message: "Wrong password" })
