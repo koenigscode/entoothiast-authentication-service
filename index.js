@@ -4,6 +4,8 @@ import PGClient from "pg-native"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 
+MqttRequest.timeout = 5000;
+
 const db = new PGClient()
 db.connectSync(process.env.CONNECTION_STRING)
 const PW_SALT_ROUNDS = process.env.PW_SALT_ROUNDS || 10
@@ -38,14 +40,14 @@ mqttReq.response("v1/users/login", (payload) => {
     if (!payload.username || !payload.password)
         return JSON.stringify({ httpStatus: 400, message: "username and password must be set" })
 
-    const users = db.querySync("select username, name, pw_hash, role from public.user where username = $1", [payload.username])
+    const users = db.querySync("select username, id, name, pw_hash, role from public.user where username = $1", [payload.username])
 
     if (!users || users.length == 0)
         return JSON.stringify({ httpStatus: 404, message: "User not found" })
 
     if (bcrypt.compareSync(payload.password, users[0].pw_hash)) {
         let user = users[0]
-        user = { username: user.username, role: user.role, name: user.name }
+        user = { username: user.username, role: user.role, name: user.name, id: user.id}
         const token = jwt.sign(user, JWT_SECRET)
         return JSON.stringify({ httpStatus: 200, user, message: "Authentication successful", token })
     }
