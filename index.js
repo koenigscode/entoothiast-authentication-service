@@ -5,6 +5,7 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 
 MqttRequest.timeout = 5000;
+MqttRequest.publishOptions = { qos: 2 };
 
 const db = new PGClient()
 db.connectSync(process.env.CONNECTION_STRING)
@@ -18,7 +19,7 @@ export const mqttReq = new MqttRequest.default(client);
 console.log(`Broker URL: ${process.env.BROKER_URL}`)
 
 
-mqttReq.response("v1/users/register", (payload) => {
+mqttReq.response("$share/authentication-service/v1/users/register", (payload) => {
     payload = JSON.parse(payload)
 
     if (!payload.username || !payload.password || !payload.name || !payload.role)
@@ -34,7 +35,7 @@ mqttReq.response("v1/users/register", (payload) => {
     }
 });
 
-mqttReq.response("v1/users/login", (payload) => {
+mqttReq.response("$share/authentication-service/v1/users/login", (payload) => {
     payload = JSON.parse(payload)
 
     if (!payload.username || !payload.password)
@@ -47,7 +48,7 @@ mqttReq.response("v1/users/login", (payload) => {
 
     if (bcrypt.compareSync(payload.password, users[0].pw_hash)) {
         let user = users[0]
-        user = { username: user.username, role: user.role, name: user.name, id: user.id}
+        user = { username: user.username, role: user.role, name: user.name, id: user.id }
         const token = jwt.sign(user, JWT_SECRET)
         return JSON.stringify({ httpStatus: 200, user, message: "Authentication successful", token })
     }
