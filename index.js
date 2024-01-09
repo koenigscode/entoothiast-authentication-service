@@ -12,7 +12,7 @@ db.connectSync(process.env.CONNECTION_STRING)
 const PW_SALT_ROUNDS = process.env.PW_SALT_ROUNDS || 10
 const JWT_SECRET = process.env.JWT_SECRET || "very secret secret"
 
-const client = mqtt.connect(process.env.BROKER_URL)
+const client = mqtt.connect(process.env.BROKER_URL, { clean: true })
 /** @type {MqttRequest}*/
 export const mqttReq = new MqttRequest.default(client);
 
@@ -57,7 +57,12 @@ mqttReq.response("$share/authentication-service/v1/users/login", (payload) => {
 })
 
 
-
 client.on("connect", async () => {
     console.log("authentication-service connected to broker")
+});
+
+process.on('SIGINT', () => {
+    client.end(); // since we're using a clean session, this unsubscribes from all topics
+    console.log('Disconnected from MQTT broker');
+    process.exit();
 });
